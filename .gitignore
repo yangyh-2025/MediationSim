@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+*.db
+.venv/
+.env
+
+# Node / Vite
+node_modules/
+frontend/dist/
+.npm/
+.eslintcache
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OMC
+.omc/
+
+# Test / Lint artifacts
+.coverage
+.ruff_cache/
+
+# Runtime data (experiment outputs, logs)
+data/logs/
+data/mediation_sim.db
