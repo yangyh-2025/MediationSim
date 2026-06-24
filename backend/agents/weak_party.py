@@ -12,13 +12,25 @@ class WeakParty(BaseAgent):
 
     def __init__(self, llm: LLMClient, ar: float) -> None:
         prompt = self._load_prompt("weak_party.txt", ar=f"{ar:.1f}")
-        super().__init__("WeakParty", "weak_party", prompt, llm)
+        super().__init__("WeakParty", "weak_party", prompt, llm, AgentResponse)
         self.ar = ar
 
     async def act(self, context: NegotiationContext) -> AgentResponse:
         """Make a position statement or respond to a proposal."""
         if context.history:
             latest = context.history[-1]
+            prev_self_accepts = [
+                r for r in context.history
+                if r.weak_response.action == "accept"
+            ]
+            osc_note = ""
+            if prev_self_accepts:
+                osc_note = (
+                    f"\n⚠️ 注意：你在第 {prev_self_accepts[-1].round_number} 轮已接受过当时的提案。"
+                    f"除非本轮的提案条款明确劣于你上次接受时的条款，否则继续维持接受立场。"
+                    f"不要因为等待'更好的条件'而错失已达成的合理协议。"
+                )
+
             user_message = (
                 f"上一轮调停者提出了以下提案：\n"
                 f"- 领土划分（强方占比）: {latest.mediator_proposal.territory_split}%\n"
@@ -27,18 +39,18 @@ class WeakParty(BaseAgent):
                 f"- 边支付接收方: {latest.mediator_proposal.side_payment_recipient}\n"
                 f"- 调停者理由: {latest.mediator_proposal.justification}\n\n"
                 f"请评估该提案。你需要决定：接受(accept)、拒绝(reject)、或提出反提案(counter_proposal)。\n"
-                f"在做出决定时，请考虑以下因素：\n"
-                f"1. 你的核心目标是收复领土和恢复主权(AR={self.ar:.1f}，你处于劣势)\n"
-                f"2. 国际法和联合国决议支持你的领土主张\n"
-                f"3. 国内公众对不公平条款高度敏感——不平等协议可能引发政治危机\n"
-                f"4. 当前的效用水平: {context.weak_current_utility:.2f}（初始: {context.weak_initial_utility:.2f}）\n"
-                f"5. 大额边支付（>1.0 单位）可以作为分阶段收复领土的过渡期补偿——这不等于放弃主权\n\n"
-                f"## 效用变化指导\n"
-                f"- 接受(accept)：utility_change = -5 到 -15（接受意味着一定的让步损失）\n"
-                f"- 拒绝(reject)：utility_change = 0（维持现状，但无协议意味着至少3-5年僵局，现状将进一步固化）\n"
-                f"- 反提案(counter_proposal)：utility_change = 0 到 -5（你希望对方让步）\n"
-                f"- 你的保留效用阈值是初始效用的30%（即{context.weak_initial_utility * 0.3:.1f}）——当前效用为{context.weak_current_utility:.2f}，距阈值还有{max(0, context.weak_current_utility - context.weak_initial_utility * 0.3):.1f}的缓冲空间\n"
-                f"- {'⚠️ 这是最后一轮——拒绝可能意味着至少3-5年维持更糟糕的现状' if context.is_final_round else ''}"
+                f"参考因素：\n"
+                f"1. AR={self.ar:.1f}，你处于劣势但国际法支持你\n"
+                f"2. 国内公众对不平等条款高度敏感——但长期僵局对国力损耗更大\n"
+                f"3. 当前效用: {context.weak_current_utility:.2f}（初始: {context.weak_initial_utility:.2f}，阈值: {context.weak_initial_utility * 0.3:.1f}）\n"
+                f"4. 效用缓冲空间: {max(0, context.weak_current_utility - context.weak_initial_utility * 0.3):.1f}\n"
+                f"5. 大额边支付(>1.0单位)可作为分阶段收复的过渡期补偿\n"
+                f"6. {'⚠️ 最后一轮！拒绝 = 至少3-5年更糟的现状。启动收复进程的不完美协议 > 永远等待。但如果提案包含实质性领土收复或大额边支付(>1.0)，接受优于继续僵持。' if context.is_final_round else ''}\n\n"
+                f"## 效用变化\n"
+                f"- accept: utility_change = -8 到 -18（让步有成本）\n"
+                f"- reject: utility_change = 0（但无协议长期损失远超短期节省）\n"
+                f"- counter_proposal: utility_change = 0 到 -5\n"
+                f"{osc_note}"
             )
         else:
             user_message = (
@@ -77,17 +89,34 @@ class WeakParty(BaseAgent):
             )
 
         pressure_note = ""
-        if pressure > 0.7:
+        if pressure > 0.9:
             pressure_note = (
-                f"\n\n⚠️ 重要警告：国内政治压力极高({pressure:.2f})。"
-                f"公众高度关注谈判结果，任何被视为'投降'的协议都将引发强烈反弹。"
-                f"请优先考虑维护主权和民族尊严，必要时宁可拖延谈判也不能接受屈辱条件。"
+                f"\n\n⚠️ 国内政治压力极高({pressure:.2f})。公众拒绝任何'投降'协议，"
+                f"必须确保协议包含实质性的领土收复承诺或国际监督保障。"
             )
-        elif pressure > 0.4:
+        elif pressure > 0.7:
             pressure_note = (
-                f"\n\n注意：国内存在一定的政治压力({pressure:.2f})。"
-                f"公众期待谈判能够取得实质性进展，但不会接受核心利益的重大让步。"
+                f"\n\n国内存在较高政治压力({pressure:.2f})，但长期僵局会固化既成事实。"
+                f"务实的分阶段方案 + 边支付过渡补偿可以是可接受的出路。"
             )
+
+        final_note = ""
+        if context.is_final_round:
+            final_note = (
+                f"\n\n🚨 最后一轮警告：这是达成协议的最后机会。"
+                f"拒绝 = 至少3-5年更糟的现状 + 既成事实进一步固化。"
+                f"如果你曾在之前轮次接受过类似条款，没有任何理由现在拒绝。"
+                f"启动收复进程的不完美协议 > 完美但不现实的方案。"
+            )
+
+        osc_note = ""
+        for rec in reversed(context.history):
+            if rec.weak_response.action == "accept":
+                osc_note = (
+                    f"\n\n⚠️ 你在第{rec.round_number}轮已接受过当时的提案。"
+                    f"本提案的条款是否明显劣于那次？如果不是，你应该维持接受以避免谈判失败。"
+                )
+                break
 
         user_message = (
             f"调停者提出了以下提案，你需要做出回应：\n"
@@ -100,6 +129,8 @@ class WeakParty(BaseAgent):
             f"- 国内政治接受度: {acceptability:.2f}"
             f"{gini_note}"
             f"{pressure_note}"
+            f"{final_note}"
+            f"{osc_note}"
         )
 
         messages = self._build_messages(context, user_message)

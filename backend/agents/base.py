@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from abc import ABC, abstractmethod
 from pathlib import Path
 
@@ -15,10 +16,10 @@ class BaseAgent(ABC):
     """Abstract base for all negotiation simulation agents.
 
     CACHE STRATEGY (DeepSeek V4 prefix caching):
-    - system_prompt is LOADED ONCE in __init__ and NEVER modified
-    - _build_messages always puts system prompt as messages[0]
-    - dynamic content (context summary + user message) goes in the user message ONLY
-    - This ensures byte-exact prefix matching for cache hits across rounds
+    - system_prompt (including JSON schema) is IMMUTABLE — loaded once, never changed
+    - _build_messages always puts system_prompt as messages[0]
+    - Dynamic content goes in user message only, static content goes in system prompt
+    - JSON schema lives in system prompt (not appended to user message) for maximum cache hit
     """
 
     def __init__(
@@ -27,11 +28,22 @@ class BaseAgent(ABC):
         role: str,
         system_prompt: str,
         llm: LLMClient,
+        output_schema: type[BaseModel] | None = None,
     ) -> None:
         self.name = name
         self.role = role
-        self.system_prompt = system_prompt  # IMMUTABLE — never modify
         self.llm = llm
+        self.output_schema = output_schema
+        # Append JSON schema to system prompt for DeepSeek cache hit optimization
+        if output_schema is not None:
+            s = output_schema.model_json_schema()
+            schema_str = json.dumps(s, ensure_ascii=False, indent=2)
+            self.system_prompt = (
+                system_prompt
+                + f"\n\n## 输出要求\n请严格按以下 JSON Schema 输出，只输出裸 JSON：\n```\n{schema_str}\n```"
+            )
+        else:
+            self.system_prompt = system_prompt
 
     @staticmethod
     def _load_prompt(filename: str, **kwargs: object) -> str:

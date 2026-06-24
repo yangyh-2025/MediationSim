@@ -192,19 +192,8 @@ class LLMClient:
         if response_schema is not None and max_tokens is None:
             max_tok = max_tok * 2
 
-        # DeepSeek doesn't support response_format → inject JSON schema into prompt instead
-        msgs = list(messages)  # shallow copy
-        if response_schema is not None:
-            s = response_schema.model_json_schema()
-            schema_str = json.dumps(s, ensure_ascii=False, indent=2)
-            json_hint = (
-                f"\n\n【输出要求】请严格按照以下 JSON Schema 格式输出，只输出 JSON，不要 Markdown 代码块：\n```\n{schema_str}\n```"
-            )
-            # Append to the LAST user message
-            for i in range(len(msgs) - 1, -1, -1):
-                if msgs[i]["role"] == "user":
-                    msgs[i] = {"role": "user", "content": msgs[i]["content"] + json_hint}
-                    break
+        # DeepSeek doesn't support response_format → schema is baked into system_prompt by BaseAgent
+        msgs = list(messages)  # shallow copy — do NOT mutate caller's messages
 
         last_exception: Exception | None = None
 

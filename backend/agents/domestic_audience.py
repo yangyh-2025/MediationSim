@@ -10,7 +10,7 @@ class DomesticAudience(BaseAgent):
 
     def __init__(self, llm: LLMClient) -> None:
         prompt = self._load_prompt("domestic_audience.txt")
-        super().__init__("DomesticAudience", "domestic_audience", prompt, llm)
+        super().__init__("DomesticAudience", "domestic_audience", prompt, llm, DomesticScore)
 
     async def act(
         self,
@@ -58,16 +58,16 @@ class DomesticAudience(BaseAgent):
             f"请输出 DomesticScore，包含：\n"
             f"1. **political_acceptability** (0-1): 国内政治可接受度\n"
             f"   - 综合考虑领土得失、经济成本收益、民族尊严、安全保障\n"
-            f"   - 1.0 = 完全可接受（国内广泛支持），0.0 = 完全不可接受（可能引发政权危机）\n"
+            f"   - 使用全量程：有利提案 0.55-0.95，中等提案 0.25-0.70，不利提案 0.05-0.35\n"
+            f"   - 边支付流入本国应显著提高可接受度(+0.15~0.30)\n"
             f"2. **pressure_level** (0-1): 对谈判代表的国内政治压力\n"
-            f"   - 基于政治可接受度的反向映射：低接受度→高压力\n"
-            f"   - 1.0 = 极度压力（领导人面临下台风险），0.0 = 无压力\n"
+            f"   - 大致映射为 1.0 - acceptability，但允许±0.2的偏差\n"
+            f"   - 大部分轮次应在 0.25-0.75 之间，仅极端不利时 >0.85\n"
             f"3. **key_concerns**: 国内各方最关心的2-5个关键问题列表\n"
             f"4. **agent_type**: 设为 \"{audience_for}\"\n\n"
-            f"⚠️ 注意：{'强方国内对领土损失高度敏感' if audience_for == 'strong' else '弱方国内对不平等条款高度敏感'}\n\n"
-            f"【格式警告】你必须严格输出 DomesticScore，不是 AgentResponse 也不是 Proposal！\n"
-            f"输出必须仅包含以下字段：\n"
-            f'{{"agent_type": "{audience_for}", "political_acceptability": <0到1>, "pressure_level": <0到1>, "key_concerns": [<2-5个字符串>]}}\n'
+            f"⚠️ 注意：{'强方国内对领土损失高度敏感，但边支付补偿和最后轮次的紧迫感应被充分考虑' if audience_for == 'strong' else '弱方国内对不平等条款高度敏感，但边支付补偿和分阶段方案的可行性应被充分考虑'}\n\n"
+            f"【格式警告】你必须严格输出 DomesticScore 对象，包含且仅包含以下字段：\n"
+            f'{{"agent_type": "{audience_for}", "political_acceptability": <0到1的浮点数>, "pressure_level": <0到1的浮点数>, "key_concerns": [<2到5个字符串>]}}\n'
             f"禁止输出 action、counter_proposal、reasoning、utility_change（那是 AgentResponse 的字段）。\n"
             f"禁止输出 territory_split、resource_allocation、side_payment_amount、justification（那是 Proposal 的字段）。\n"
             f"你唯一的任务是评估政治可接受度——仅此而已。"

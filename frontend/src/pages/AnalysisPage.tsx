@@ -19,14 +19,17 @@ import {
 import {
   FileExcelOutlined,
   FileTextOutlined,
+  ThunderboltOutlined,
 } from '@ant-design/icons';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   listExperiments,
   getStatistics,
   getRunTranscript,
   getRunDetail,
   listRuns,
+  runPersistenceAnalysis,
+  getPersistenceKMF,
 } from '../api/client';
 import SurvivalChart from '../components/SurvivalChart';
 import MediationDiagram from '../components/MediationDiagram';
@@ -42,6 +45,7 @@ const { Title, Text, Paragraph } = Typography;
 const AnalysisPage: React.FC = () => {
   const [selectedId, setSelectedId] = useState<string | undefined>(undefined);
   const [selectedRunId, setSelectedRunId] = useState<string | undefined>(undefined);
+  const queryClient = useQueryClient();
 
   const { data: experiments } = useQuery({
     queryKey: ['experiments'],
@@ -78,6 +82,30 @@ const AnalysisPage: React.FC = () => {
     queryKey: ['transcript', selectedId, selectedRunId],
     queryFn: () => getRunTranscript(selectedId!, selectedRunId!),
     enabled: !!selectedId && !!selectedRunId,
+  });
+
+  // ── Phase 4 persistence ──────────────────────────────
+  const { data: persistenceKMF, isLoading: persistenceLoading } = useQuery({
+    queryKey: ['persistenceKMF', selectedId],
+    queryFn: () => getPersistenceKMF(selectedId!),
+    enabled: !!selectedId,
+  });
+
+  const persistenceMutation = useMutation({
+    mutationFn: () => runPersistenceAnalysis(selectedId!),
+    onSuccess: (data: any) => {
+      if (data.status === 'no_agreement_cases') {
+        message.warning(data.message || '该实验没有达成协议案例');
+      } else {
+        message.success(
+          `持久性分析完成：${data.total_cases} 个案例，${data.broke_count} 破裂，${data.survived_count} 存活`,
+        );
+        queryClient.invalidateQueries({ queryKey: ['persistenceKMF', selectedId] });
+      }
+    },
+    onError: (err: any) => {
+      message.error(`持久性分析失败：${err?.response?.data?.detail || err.message}`);
+    },
   });
 
   // ---- Kaplan-Meier mock data builder ----
@@ -368,135 +396,214 @@ const AnalysisPage: React.FC = () => {
                 label: '生存分析',
                 children: (
                   <div>
-                    <SurvivalChart
-                      kmfData={kmfData}
-                      title="Kaplan-Meier 生存曲线：三种调停者类型"
-                      height={420}
-                    />
-                    <Card
-                      title="Log-rank 检验结果"
-                      size="small"
-                      style={{ marginTop: 16 }}
-                    >
-                      <Table
-                        dataSource={[
-                          {
-                            key: 'logrank',
-                            test_name: 'Log-rank 检验',
-                            statistic: 8.45,
-                            p_value: 0.015,
-                            significant: true,
-                            interpretation:
-                              '三种调停者类型的生存曲线存在显著差异（p < 0.05），表明调停者偏见类型对协议持久性有显著影响。',
-                          },
-                        ]}
-                        columns={[
-                          { title: '检验方法', dataIndex: 'test_name', key: 'test_name' },
-                          {
-                            title: '统计量',
-                            dataIndex: 'statistic',
-                            key: 'statistic',
-                            render: (v: number) => v.toFixed(3),
-                          },
-                          {
-                            title: 'p 值',
-                            dataIndex: 'p_value',
-                            key: 'p_value',
-                            render: (v: number) => (
-                              <Text style={{ color: v < 0.05 ? '#52c41a' : '#ff4d4f' }}>
-                                {v.toFixed(4)}
-                              </Text>
-                            ),
-                          },
-                          {
-                            title: '显著',
-                            dataIndex: 'significant',
-                            key: 'significant',
-                            render: (v: boolean) => (
-                              <Tag color={v ? 'success' : 'error'}>
-                                {v ? '是' : '否'}
-                              </Tag>
-                            ),
-                          },
-                          {
-                            title: '解释',
-                            dataIndex: 'interpretation',
-                            key: 'interpretation',
-                            width: 400,
-                          },
-                        ]}
-                        rowKey="key"
-                        pagination={false}
-                        size="small"
-                      />
+                    <Card size="small" style={{ marginBottom: 16 }}>
+                      <Row gutter={16} align="middle">
+                        <Col>
+                          <Text strong>数据源：</Text>
+                        </Col>
+                        <Col>
+                          <Tag color="blue">
+                            {persistenceKMF?.kmf_data?.length
+                              ? `持久性分析已完成 (${persistenceKMF.kmf_data.length} 组)`
+                              : '待运行'}
+                          </Tag>
+                        </Col>
+                        <Col flex="auto" />
+                        <Col>
+                          <Space>
+                            <Button
+                              type="primary"
+                              icon={<ThunderboltOutlined />}
+                              loading={persistenceMutation.isPending}
+                              onClick={() => persistenceMutation.mutate()}
+                              disabled={!selectedId}
+                            >
+                              运行持久性分析
+                            </Button>
+                          </Space>
+                        </Col>
+                      </Row>
                     </Card>
-                    <Card
-                      title="Cox 比例风险模型"
-                      size="small"
-                      style={{ marginTop: 16 }}
-                    >
-                      <Table
-                        dataSource={[
-                          {
-                            variable: '调停者类型（亲强）',
-                            coefficient: 0.45,
-                            hazard_ratio: 1.57,
-                            p_value: 0.023,
-                          },
-                          {
-                            variable: '调停者类型（中立）',
-                            coefficient: -0.12,
-                            hazard_ratio: 0.89,
-                            p_value: 0.42,
-                          },
-                          {
-                            variable: '不对称度（高）',
-                            coefficient: 0.68,
-                            hazard_ratio: 1.97,
-                            p_value: 0.005,
-                          },
-                          {
-                            variable: '附带支付启用',
-                            coefficient: -0.35,
-                            hazard_ratio: 0.70,
-                            p_value: 0.018,
-                          },
-                        ]}
-                        columns={[
-                          { title: '变量', dataIndex: 'variable', key: 'variable' },
-                          {
-                            title: '系数 (β)',
-                            dataIndex: 'coefficient',
-                            key: 'coefficient',
-                            render: (v: number) => v.toFixed(3),
-                          },
-                          {
-                            title: '风险比 (HR)',
-                            dataIndex: 'hazard_ratio',
-                            key: 'hazard_ratio',
-                            render: (v: number) => v.toFixed(3),
-                          },
-                          {
-                            title: 'p 值',
-                            dataIndex: 'p_value',
-                            key: 'p_value',
-                            render: (v: number) => (
-                              <Text style={{ color: v < 0.05 ? '#52c41a' : '#ff4d4f' }}>
-                                {v.toFixed(4)}
+
+                    {persistenceLoading ? (
+                      <Spin style={{ display: 'block', margin: '60px auto' }} />
+                    ) : persistenceKMF?.kmf_data?.length ? (
+                      <>
+                        <SurvivalChart
+                          kmfData={persistenceKMF.kmf_data}
+                          title="Kaplan-Meier 生存曲线：三种调停者类型"
+                          height={420}
+                        />
+                        {persistenceKMF.log_rank && (
+                          <Card
+                            title="Log-rank 检验结果"
+                            size="small"
+                            style={{ marginTop: 16 }}
+                          >
+                            <Table
+                              dataSource={[{
+                                key: 'logrank',
+                                ...persistenceKMF.log_rank,
+                              }]}
+                              columns={[
+                                { title: '检验方法', dataIndex: 'test_name', key: 'test_name' },
+                                {
+                                  title: '统计量',
+                                  dataIndex: 'statistic',
+                                  key: 'statistic',
+                                  render: (v: number) => v?.toFixed(3),
+                                },
+                                {
+                                  title: 'p 值',
+                                  dataIndex: 'p_value',
+                                  key: 'p_value',
+                                  render: (v: number) => (
+                                    <Text style={{ color: v < 0.05 ? '#52c41a' : '#ff4d4f' }}>
+                                      {v?.toFixed(4)}
+                                    </Text>
+                                  ),
+                                },
+                                {
+                                  title: '显著',
+                                  dataIndex: 'significant',
+                                  key: 'significant',
+                                  render: (v: boolean) => (
+                                    <Tag color={v ? 'success' : 'error'}>
+                                      {v ? '是' : '否'}
+                                    </Tag>
+                                  ),
+                                },
+                                {
+                                  title: '解释',
+                                  dataIndex: 'interpretation',
+                                  key: 'interpretation',
+                                  width: 400,
+                                },
+                              ]}
+                              rowKey="key"
+                              pagination={false}
+                              size="small"
+                            />
+                          </Card>
+                        )}
+                        {persistenceKMF.cox?.variables ? (
+                          <Card
+                            title="Cox 比例风险模型"
+                            size="small"
+                            style={{ marginTop: 16 }}
+                          >
+                            <Table
+                              dataSource={persistenceKMF.cox.variables.map(
+                                (v: any, i: number) => ({ ...v, key: String(i) }),
+                              )}
+                              columns={[
+                                { title: '变量', dataIndex: 'variable', key: 'variable' },
+                                {
+                                  title: '系数 (β)',
+                                  dataIndex: 'coefficient',
+                                  key: 'coefficient',
+                                  render: (v: number) => v?.toFixed(3),
+                                },
+                                {
+                                  title: '风险比 (HR)',
+                                  dataIndex: 'hazard_ratio',
+                                  key: 'hazard_ratio',
+                                  render: (v: number) => v?.toFixed(3),
+                                },
+                                {
+                                  title: 'p 值',
+                                  dataIndex: 'p_value',
+                                  key: 'p_value',
+                                  render: (v: number) => (
+                                    <Text style={{ color: v < 0.05 ? '#52c41a' : '#ff4d4f' }}>
+                                      {v?.toFixed(4)}
+                                    </Text>
+                                  ),
+                                },
+                              ]}
+                              rowKey="key"
+                              pagination={false}
+                              size="small"
+                            />
+                            <Paragraph style={{ marginTop: 12 }}>
+                              <Text type="secondary">
+                                Concordance = {persistenceKMF.cox.concordance}
                               </Text>
-                            ),
-                          },
-                        ]}
-                        rowKey="variable"
-                        pagination={false}
-                        size="small"
-                      />
-                      <Paragraph style={{ marginTop: 12 }}>
-                        <Text type="secondary">
-                          Concordance = 0.684 | 似然比检验 p = 0.002
-                        </Text>
-                      </Paragraph>
-                    </Card>
+                            </Paragraph>
+                          </Card>
+                        ) : null}
+                      </>
+                    ) : kmfData.length > 0 ? (
+                      <>
+                        <Paragraph type="secondary" style={{ marginBottom: 16 }}>
+                          <Text>以下是基于条件汇总生成的模拟数据。点击上方按钮运行真正的持久性分析，获取基于追加执行期的实际生存曲线。</Text>
+                        </Paragraph>
+                        <SurvivalChart
+                          kmfData={kmfData}
+                          title="Kaplan-Meier 生存曲线（模拟：仅做参考）"
+                          height={420}
+                        />
+                        <Card
+                          title="Log-rank 检验结果（模拟）"
+                          size="small"
+                          style={{ marginTop: 16 }}
+                        >
+                          <Table
+                            dataSource={[
+                              {
+                                key: 'logrank',
+                                test_name: 'Log-rank 检验（模拟）',
+                                statistic: 8.45,
+                                p_value: 0.015,
+                                significant: true,
+                                interpretation:
+                                  '⚠️ 模拟数据：三种调停者类型的生存曲线存在显著差异。请运行上方持久性分析获取实际结果。',
+                              },
+                            ]}
+                            columns={[
+                              { title: '检验方法', dataIndex: 'test_name', key: 'test_name' },
+                              {
+                                title: '统计量',
+                                dataIndex: 'statistic',
+                                key: 'statistic',
+                                render: (v: number) => v.toFixed(3),
+                              },
+                              {
+                                title: 'p 值',
+                                dataIndex: 'p_value',
+                                key: 'p_value',
+                                render: (v: number) => (
+                                  <Text style={{ color: v < 0.05 ? '#52c41a' : '#ff4d4f' }}>
+                                    {v.toFixed(4)}
+                                  </Text>
+                                ),
+                              },
+                              {
+                                title: '显著',
+                                dataIndex: 'significant',
+                                key: 'significant',
+                                render: (v: boolean) => (
+                                  <Tag color={v ? 'success' : 'error'}>
+                                    {v ? '是' : '否'}
+                                  </Tag>
+                                ),
+                              },
+                              {
+                                title: '解释',
+                                dataIndex: 'interpretation',
+                                key: 'interpretation',
+                                width: 400,
+                              },
+                            ]}
+                            rowKey="key"
+                            pagination={false}
+                            size="small"
+                          />
+                        </Card>
+                      </>
+                    ) : (
+                      <Empty description="请先运行持久性分析以查看生存曲线" />
+                    )}
                   </div>
                 ),
               },

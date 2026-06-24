@@ -262,6 +262,66 @@ async def get_log_stats(experiment_id: str):
     return logger.get_stats()
 
 
+# ── Persistence Analysis (Phase 4) ───────────────────
+
+@app.post("/api/experiments/{experiment_id}/persistence/run")
+async def run_persistence_analysis(experiment_id: str, db: Database = Depends(get_db)):
+    """Run Phase 4 persistence analysis:追加5轮执行期, build KM survival curves."""
+    try:
+        from backend.engine.persistence import PersistenceEngine
+
+        engine = PersistenceEngine(db)
+        results = await engine.run_for_experiment(experiment_id)
+        if not results:
+            return {
+                "experiment_id": experiment_id,
+                "status": "no_agreement_cases",
+                "message": "该实验没有达成协议案例,无法运行持久性分析",
+                "results": [],
+            }
+        # Calculate summary stats
+        broke_count = sum(1 for r in results if r["event"] == 1)
+        survived_count = sum(1 for r in results if r["event"] == 0)
+        return {
+            "experiment_id": experiment_id,
+            "status": "completed",
+            "total_cases": len(results),
+            "broke_count": broke_count,
+            "survived_count": survived_count,
+            "results": results,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Persistence analysis failed: {str(e)}")
+
+
+@app.get("/api/experiments/{experiment_id}/persistence/results")
+async def get_persistence_results(experiment_id: str, db: Database = Depends(get_db)):
+    """Get stored persistence analysis results."""
+    from backend.engine.persistence import PersistenceEngine
+
+    engine = PersistenceEngine(db)
+    results = await engine.get_results(experiment_id)
+    return [dict(r) for r in results]
+
+
+@app.get("/api/experiments/{experiment_id}/persistence/kmf")
+async def get_persistence_kmf(experiment_id: str, db: Database = Depends(get_db)):
+    """Get Kaplan-Meier survival data for persistence analysis."""
+    from backend.engine.persistence import PersistenceEngine
+
+    engine = PersistenceEngine(db)
+    kmf_data = await engine.get_kmf_data(experiment_id)
+    logrank_cox = await engine.get_logrank_and_cox(experiment_id)
+    return {
+        "experiment_id": experiment_id,
+        "kmf_data": kmf_data,
+        "log_rank": logrank_cox.get("log_rank"),
+        "cox": logrank_cox.get("cox"),
+    }
+
+
 # ── Background task runner ────────────────────────────
 
 async def _run_experiment(scheduler, experiment_id: str, db: Database) -> None:

@@ -16,8 +16,8 @@ from backend.engine.orchestrator import EvaluationOrchestrator
 class ExperimentScheduler:
     """Orchestrates multi-condition experiment execution.
 
-    - Conditions declared in the experiment config are executed in parallel.
-    - Within a condition, runs are sequential (stateful LLM agents).
+    - Every run (condition × run_index) is an independent parallel task.
+    - Global concurrency capped by config.max_concurrent_runs.
     - Supports pause / resume / cancel for graceful interruption.
     - Triggers fast & medium iteration evaluations automatically.
     """
@@ -54,34 +54,147 @@ class ExperimentScheduler:
     # ------------------------------------------------------------------
 
     async def run_all(self) -> list[RunResult]:
-        """Execute every condition in the experiment config.
+        """Execute every condition × run_index as an independent parallel task.
 
-        Conditions are parallelized up to config.max_concurrent_conditions.
-        Each condition runs its simulations sequentially (cache affinity).
+        Global concurrency capped by config.max_concurrent_runs.
         """
         conditions = [
             c for c in config.conditions
             if c["code"] in self.exp_config.conditions
         ]
 
-        sem = asyncio.Semaphore(config.max_concurrent_conditions)
+        # Flatten into individual run tasks
+        run_specs: list[dict] = []
+        for cond in conditions:
+            for i in range(self.exp_config.runs_per_condition):
+                run_specs.append({"condition": cond, "run_index": i})
+        total_runs = len(run_specs)
 
-        async def _run_with_limit(cond: dict) -> list[RunResult]:
+        # Shared state for progress tracking & evaluation triggers
+        completed_count = [0]  # list for mutable closure
+        lock = asyncio.Lock()
+        cond_results: dict[str, list[RunResult]] = {c["code"]: [] for c in conditions}
+        # Track which conditions have been warmed already
+        warmed_conditions: set = set()
+
+        sem = asyncio.Semaphore(config.max_concurrent_runs)
+
+        async def _run_one(spec: dict) -> RunResult:
+            nonlocal warmed_conditions
+            cond = spec["condition"]
+            code: str = cond["code"]
+            ar: float = cond["ar"]
+            bias: float = cond["bias"]
+            side_payment: bool = self.exp_config.side_payment_enabled
+            idx: int = spec["run_index"]
+
             async with sem:
-                return await self._run_condition(cond)
+                if self._cancelled:
+                    return RunResult(condition_code=code, run_index=idx,
+                                     status="cancelled", rounds_completed=0,
+                                     agreement_reached=False)
 
-        tasks = [_run_with_limit(c) for c in conditions]
-        results_per_condition = await asyncio.gather(*tasks, return_exceptions=True)
+                while self._paused:
+                    await asyncio.sleep(1.0)
 
-        all_results: list[RunResult] = []
-        for r in results_per_condition:
-            if isinstance(r, list):
-                all_results.extend(r)
+                run_id = str(uuid.uuid4())
+
+                # ── One-shot cache warm per condition ──
+                if code not in warmed_conditions:
+                    warmed_conditions.add(code)  # claim first to avoid concurrent warm
+                    try:
+                        warm_engine = NegotiationEngine(
+                            code, ar, bias, side_payment,
+                            experiment_id=self.experiment_id)
+                        await warm_engine.warm_caches()
+                        print(f"[Scheduler] Cache warmed for condition {code}")
+                    except Exception:
+                        pass
+
+                await dbq.upsert_run_progress(
+                    self.db, run_id, self.experiment_id, code, idx, 0, "running",
+                )
+
+                async def _on_round(rounds_done: int, _rid=run_id, _idx=idx) -> None:
+                    await dbq.upsert_run_progress(
+                        self.db, _rid, self.experiment_id, code, _idx,
+                        rounds_done, "running",
+                    )
+
+                engine = NegotiationEngine(
+                    code, ar, bias, side_payment,
+                    experiment_id=self.experiment_id,
+                    run_id=run_id,
+                    on_round_complete=_on_round,
+                )
+
+                try:
+                    result = await engine.run()
+                except Exception as exc:
+                    print(f"[Scheduler] Run {code}[{idx}] failed: {exc}")
+                    traceback.print_exc()
+                    result = RunResult(
+                        condition_code=code, run_index=idx,
+                        status="failed", rounds_completed=0,
+                        agreement_reached=False,
+                    )
+
+            result.run_index = idx
+            result.condition_code = code
+            result.experiment_id = self.experiment_id
+
+            await dbq.save_run_result(self.db, self.experiment_id, result)
+
+            # ── Thread-safe progress & evaluation ──
+            async with lock:
+                cond_results[code].append(result)
+                self._results.append(result)
+                completed_count[0] += 1
+
+                # Update experiment-level progress
+                await self.db.update(
+                    "experiments", "id = ?",
+                    {"completed_runs": completed_count[0],
+                     "updated_at": time.strftime("%Y-%m-%dT%H:%M:%S")},
+                    (self.experiment_id,),
+                )
+
+                # Fast evaluation (per-condition, every 10 runs)
+                cr = cond_results[code]
+                if len(cr) % config.fast_iteration_interval == 0 and len(cr) >= 10:
+                    try:
+                        await self._orchestrator.run_fast_evaluation(
+                            self.experiment_id, code, cr[-10:]
+                        )
+                    except Exception:
+                        print("[Scheduler] Fast evaluation failed, continuing...")
+                        traceback.print_exc()
+
+                # Medium evaluation (per-condition, every 30 runs)
+                if len(cr) % config.medium_iteration_interval == 0 and len(cr) > 0:
+                    try:
+                        await self._orchestrator.run_medium_evaluation(
+                            self.experiment_id, code, cr
+                        )
+                    except Exception:
+                        print("[Scheduler] Medium evaluation failed, continuing...")
+                        traceback.print_exc()
+
+            return result
+
+        tasks = [_run_one(spec) for spec in run_specs]
+        all_results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Filter out exceptions (individual errors already caught inside _run_one)
+        final_results: list[RunResult] = []
+        for r in all_results:
+            if isinstance(r, RunResult):
+                final_results.append(r)
             elif isinstance(r, Exception):
-                print(f"[Scheduler] Condition worker crashed: {r}")
+                print(f"[Scheduler] Uncaught worker crash: {r}")
                 traceback.print_exception(type(r), r, r.__traceback__)
 
-        self._results = all_results
+        self._results = final_results
 
         # ── Cache metrics summary ──
         from backend.llm.client import cache_metrics
@@ -94,120 +207,16 @@ class ExperimentScheduler:
         )
 
         # Final global evaluation (Step 8)
-        if all_results and not self._cancelled:
+        if final_results and not self._cancelled:
             try:
                 await self._orchestrator.run_global_evaluation(
-                    self.experiment_id, all_results
+                    self.experiment_id, final_results
                 )
             except Exception:
                 print("[Scheduler] Global evaluation failed, continuing...")
                 traceback.print_exc()
 
-        return all_results
-
-    # ------------------------------------------------------------------
-    # Per-condition worker
-    # ------------------------------------------------------------------
-
-    async def _run_condition(self, condition: dict) -> list[RunResult]:
-        results: list[RunResult] = []
-        code: str = condition["code"]
-        ar: float = condition["ar"]
-        bias: float = condition["bias"]
-        side_payment: bool = self.exp_config.side_payment_enabled
-
-        # ── Cache warm for this condition (once) ──
-        # First run of each condition pays the cache-miss cost once via
-        # warm_caches(). All subsequent runs in this condition hit the cache.
-        warm_engine = NegotiationEngine(code, ar, bias, side_payment, experiment_id=self.experiment_id)
-        try:
-            await warm_engine.warm_caches()
-            print(f"[Scheduler] Cache warmed for condition {code}")
-        except Exception:
-            pass  # warming failure is non-fatal
-
-        for i in range(self.exp_config.runs_per_condition):
-            if self._cancelled:
-                break
-
-            while self._paused:
-                await asyncio.sleep(1.0)
-
-            run_id = str(uuid.uuid4())
-
-            # ── Flush initial "running" record so monitor sees it ──
-            await dbq.upsert_run_progress(
-                self.db, run_id, self.experiment_id, code, i, 0, "running",
-            )
-
-            async def _on_round(rounds_done: int, _rid=run_id, _idx=i) -> None:
-                await dbq.upsert_run_progress(
-                    self.db, _rid, self.experiment_id, code, _idx, rounds_done, "running",
-                )
-                # bump completed count (DB-driven)
-                await self.db.update(
-                    "experiments", "id = ?",
-                    {"updated_at": time.strftime("%Y-%m-%dT%H:%M:%S")},
-                    (self.experiment_id,),
-                )
-
-            engine = NegotiationEngine(
-                code, ar, bias, side_payment,
-                experiment_id=self.experiment_id,
-                run_id=run_id,
-                on_round_complete=_on_round,
-            )
-
-            try:
-                result = await engine.run()
-            except Exception as exc:
-                print(f"[Scheduler] Run {code}[{i}] failed: {exc}")
-                traceback.print_exc()
-                result = RunResult(
-                    condition_code=code,
-                    run_index=i,
-                    status="failed",
-                    rounds_completed=0,
-                    agreement_reached=False,
-                )
-
-            result.run_index = i
-            result.condition_code = code
-            result.experiment_id = self.experiment_id
-
-            await dbq.save_run_result(self.db, self.experiment_id, result)
-            results.append(result)
-
-            # Update experiment progress
-            completed = await self._count_completed_runs()
-            await self.db.update(
-                "experiments",
-                "id = ?",
-                {"completed_runs": completed, "updated_at": time.strftime("%Y-%m-%dT%H:%M:%S")},
-                (self.experiment_id,),
-            )
-
-            # Fast iteration evaluation (every 10 runs)
-            if (i + 1) % config.fast_iteration_interval == 0 and len(results) >= 10:
-                try:
-                    await self._orchestrator.run_fast_evaluation(
-                        self.experiment_id, code, results[-10:]
-                    )
-                except Exception:
-                    print("[Scheduler] Fast evaluation failed, continuing...")
-                    traceback.print_exc()
-
-            # Medium iteration evaluation (every 30 runs)
-            if (i + 1) % config.medium_iteration_interval == 0:
-                try:
-                    await self._orchestrator.run_medium_evaluation(
-                        self.experiment_id, code, results
-                    )
-                except Exception:
-                    print("[Scheduler] Medium evaluation failed, continuing...")
-                    traceback.print_exc()
-
-        return results
+        return final_results
 
     # ------------------------------------------------------------------
     # Helpers

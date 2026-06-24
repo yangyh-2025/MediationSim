@@ -27,11 +27,11 @@ class Config:
     max_rounds: int = 8
     runs_per_condition: int = 10
     max_proposals_per_round: int = 3
-    side_payment_budget_pct: float = 2.0  # % of mediator GDP
+    side_payment_budget_pct: float = 3.0  # % of mediator GDP
 
     # ── Concurrency ───────────────────────────────────
-    max_concurrent_conditions: int = 7    # DeepSeek 500并发 → 全部条件并行
-    llm_concurrency: int = 50             # LLM 调用全局并发上限
+    max_concurrent_runs: int = 300       # 全局同时运行的最大 run 数
+    llm_concurrency: int = 300           # LLM API 调用全局并发上限（DeepSeek 限流阈值 500）
 
     # ── Evaluation ────────────────────────────────────
     fast_iteration_interval: int = 10
@@ -75,8 +75,8 @@ class Config:
             llm_api_key=os.getenv("OPENAI_API_KEY", ""),
             llm_base_url=os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1"),
             llm_model=os.getenv("LLM_MODEL", "gpt-4o"),
-            max_concurrent_conditions=int(os.getenv("MAX_CONCURRENT_CONDITIONS", "7")),
-            llm_concurrency=int(os.getenv("LLM_CONCURRENCY", "50")),
+            max_concurrent_runs=int(os.getenv("MAX_CONCURRENT_RUNS", "300")),
+            llm_concurrency=int(os.getenv("LLM_CONCURRENCY", "300")),
         )
 
 

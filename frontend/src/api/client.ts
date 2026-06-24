@@ -278,4 +278,27 @@ export async function getConditionSummary(
   }));
 }
 
+// ── Persistence Analysis (Phase 4) ─────────────────────
+
+export async function runPersistenceAnalysis(
+  experimentId: string,
+): Promise<any> {
+  const res = await client.post<any>(`/experiments/${experimentId}/persistence/run`);
+  return res.data;
+}
+
+export async function getPersistenceResults(
+  experimentId: string,
+): Promise<any[]> {
+  const res = await client.get<any[]>(`/experiments/${experimentId}/persistence/results`);
+  return res.data || [];
+}
+
+export async function getPersistenceKMF(
+  experimentId: string,
+): Promise<{ kmf_data: any[]; log_rank: any; cox: any }> {
+  const res = await client.get<any>(`/experiments/${experimentId}/persistence/kmf`);
+  return res.data || { kmf_data: [], log_rank: null, cox: null };
+}
+
 export default client;

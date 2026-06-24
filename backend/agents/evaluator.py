@@ -17,7 +17,7 @@ class Evaluator(BaseAgent):
 
     def __init__(self, llm: LLMClient) -> None:
         prompt = self._load_prompt("evaluator.txt")
-        super().__init__("Evaluator", "evaluator", prompt, llm)
+        super().__init__("Evaluator", "evaluator", prompt, llm, EvaluationReport)
 
     async def act(self, context: NegotiationContext) -> EvaluationReport:
         """Evaluator does not participate in the negotiation loop directly.

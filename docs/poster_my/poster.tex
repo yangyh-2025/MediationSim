@@ -1,0 +1,225 @@
+\documentclass{article}
+\usepackage[paperwidth=841mm,paperheight=1189mm,margin=0mm]{geometry}
+\usepackage{fontspec}\usepackage[CJKmath=true,AutoFakeBold=true]{xeCJK}
+\setCJKmainfont{FangSong}[BoldFont=SimHei]\setCJKsansfont{SimHei}
+\usepackage[T1]{fontenc}\usepackage{lmodern}
+\usepackage{xcolor,graphicx,booktabs,array,ragged2e,enumitem,hyperref,amsmath}
+\definecolor{fblue}{RGB}{0,47,108}\definecolor{gold}{RGB}{200,150,62}\definecolor{ared}{RGB}{180,45,45}
+\pagestyle{empty}\setlength{\parindent}{0pt}\setlength{\parskip}{0pt}
+
+% sizes: title 60pt, subtitle 34pt, author 26pt, section=30pt, body=24pt, table=21pt, cap=15pt, ref=18pt
+
+\begin{document}
+% HEADER
+\colorbox{fblue}{\begin{minipage}{841mm}\vspace{10mm}\centering
+{\fontsize{60}{72}\selectfont\bfseries\sffamily\color{white}偏见调停中的提案偏向、附带支付与国内评价\\[5mm]}
+{\fontsize{34}{42}\selectfont\sffamily\color{gold}——基于LLM多智能体系统的戴维营协议模拟实验——\\[4mm]}
+{\fontsize{26}{34}\selectfont\sffamily\color{white!90}杨昱航\ \ |\ \ 复旦大学\ \ 国际关系与公共事务学院}\\[2.5mm]
+{\fontsize{18}{24}\selectfont\sffamily\color{white!70}DeepSeek V4 Flash\ |\ 121次模拟\ |\ 9轮预实验迭代（V1--V9）}
+\vspace{12mm}\end{minipage}}\\[-0.4mm]
+\colorbox{gold}{\begin{minipage}{841mm}\vspace{1.8mm}\end{minipage}}
+
+\vspace{4mm}
+\begin{minipage}[t]{841mm}
+\hspace{20mm}\begin{minipage}[t]{259mm}
+
+% COL 1
+\noindent\colorbox{fblue!12}{\begin{minipage}{259mm}\vspace{2mm}\hspace{3mm}{\fontsize{30}{38}\selectfont\bfseries\sffamily\color{fblue}一、研究背景与假设}\vspace{2mm}\end{minipage}}\\[1mm]
+\textcolor{gold}{\rule{259mm}{1.5pt}}\\[2mm]
+
+{\fontsize{24}{34}\selectfont\raggedright%
+1978年戴维营协议：亲以色列的卡特通过{\color{ared}大规模附带支付}促成埃以和平，挑战“中立=有效”的经典范式。Kim（2025）提供了博弈论框架，但{\color{ared}缺乏实证检验}。本研究构建LLM多智能体系统，在可控实验中检验四项假设。
+
+\vspace{2mm}
+\textbf{H1（偏见$\to$提案）：}亲强方案偏强方，亲弱偏弱方，中立等分。
+
+\textbf{H2（偏见$\to$公平性$\downarrow$）：}任何方向偏见均使基尼系数升高。
+
+\textbf{H3（支付$\to$协议率$\uparrow$）：}禁用后跌幅在低不对称下最大。
+
+\textbf{H4（偏见$\to$评价反向）：}亲强下强方满意、弱方抵制；亲弱反转。
+\par}
+
+\vspace{4mm}
+
+\noindent\colorbox{fblue!12}{\begin{minipage}{259mm}\vspace{2mm}\hspace{3mm}{\fontsize{30}{38}\selectfont\bfseries\sffamily\color{fblue}二、实验设计}\vspace{2mm}\end{minipage}}\\[1mm]
+\textcolor{gold}{\rule{259mm}{1.5pt}}\\[2mm]
+
+{\fontsize{24}{34}\selectfont\raggedright 2x3全因子+1参照组，7条件，每条件10--11次独立模拟。
+\par}
+
+\vspace{1mm}
+{\centering\renewcommand{\arraystretch}{1.5}\fontsize{21}{28}\selectfont%
+\begin{tabular}{lcccc}
+\toprule
+\textbf{条件} & \textbf{AR} & \textbf{偏见(b)} & \textbf{支付} & \textbf{角色} \\
+\midrule
+H-PS & 高3.0 & 亲强+0.7 & 启用 & 高不对称偏见 \\
+H-N  & 高3.0 & 中立 0.0 & 禁用 & 高不对称基线 \\
+H-PW & 高3.0 & 亲弱--0.7 & 禁用 & 高不对称反偏 \\
+L-PS & 低1.5 & 亲强+0.7 & 启用 & 低不对称偏见 \\
+L-N  & 低1.5 & 中立 0.0 & 禁用 & 低不对称基线 \\
+L-PW & 低1.5 & 亲弱--0.7 & 禁用 & 低不对称反偏 \\
+CD   & 参2.0 & 亲强+0.7 & 启用 & 戴维营锚点 \\
+\bottomrule
+\end{tabular}\par}
+
+\vspace{1mm}
+{\fontsize{24}{34}\selectfont\raggedright 五类智能体：强方/弱方/调停者（3型，支付仅亲强配置）/国内观众/独立评估（6维质控）。8轮谈判，支付三阶段递增（R1--4$\le$8\%/R5--6$\le$12\%/R7--8无上限）。预实验9轮迭代（126次），V1$\to$V9收敛。核心教训：{\color{ared}不得硬编码数字阈值分支}。\par}
+
+\vspace{4mm}
+
+\noindent\colorbox{fblue!12}{\begin{minipage}{259mm}\vspace{2mm}\hspace{3mm}{\fontsize{30}{38}\selectfont\bfseries\sffamily\color{fblue}三、框架与协议率}\vspace{2mm}\end{minipage}}\\[1mm]
+\textcolor{gold}{\rule{259mm}{1.5pt}}\\[2mm]
+
+{\centering\includegraphics[width=235mm]{figures/fig10_conceptual_model.png}\par}
+\vspace{0.5mm}{\centering\fontsize{15}{20}\selectfont\sffamily 图1：研究概念框架\par}
+
+\vspace{3mm}
+{\centering\includegraphics[width=235mm]{figures/fig1_agreement_rates.png}\par}
+\vspace{0.5mm}{\centering\fontsize{15}{20}\selectfont\sffamily 图2：各条件协议率（总体50.0\%）\par}
+
+\vspace{1mm}
+{\fontsize{24}{34}\selectfont\raggedright {\color{ared}亲强52.4\% \ \ 中立59.1\% \ \ 亲弱40.0\%}。中立公平策略（51:49）双边接受性最高；亲弱组强方缺让步动机。\par}
+
+\end{minipage}%
+\hspace{16mm}%
+\begin{minipage}[t]{259mm}
+
+% COL 2
+\noindent\colorbox{fblue!12}{\begin{minipage}{259mm}\vspace{2mm}\hspace{3mm}{\fontsize{30}{38}\selectfont\bfseries\sffamily\color{fblue}四、H1＋H2 核心结果}\vspace{2mm}\end{minipage}}\\[1mm]
+\textcolor{gold}{\rule{259mm}{1.5pt}}\\[2mm]
+
+{\centering\includegraphics[width=235mm]{figures/fig2_territory_splits.png}\par}
+\vspace{0.5mm}{\centering\fontsize{15}{20}\selectfont\sffamily 图3：领土分配（\%归强方）\par}
+
+\vspace{1mm}
+{\fontsize{24}{34}\selectfont\raggedright \textbf{H1成立：}{\color{ared}亲强73\% \ \ 中立51\% \ \ 亲弱38\%}。$d=4$--$7$，$p<.001$。\par}
+
+\vspace{1mm}
+{\centering\renewcommand{\arraystretch}{1.45}\fontsize{21}{28}\selectfont%
+\begin{tabular}{lccc}
+\toprule
+\textbf{比较} & \textbf{\textit{t}} & \textbf{\textit{d}} & \textbf{\textit{p}} \\
+\midrule
+H-PS vs H-N  & 12.0 & {\color{ared}\textbf{6.02}} & $<$.001 \\
+L-PS vs L-N  &  8.2 & {\color{ared}\textbf{4.08}} & $<$.001 \\
+H-PS vs H-PW & 15.1 & {\color{ared}\textbf{7.29}} & $<$.001 \\
+\bottomrule
+\end{tabular}\par}
+
+\vspace{2mm}
+{\centering\includegraphics[width=235mm]{figures/fig3_gini_coefficients.png}\par}
+\vspace{0.5mm}{\centering\fontsize{15}{20}\selectfont\sffamily 图4：基尼系数分布\par}
+
+\vspace{1mm}
+{\fontsize{24}{34}\selectfont\raggedright \textbf{H2成立：}$F(2,54)=40.6$，$\eta^2=0.601$。Tukey HSD三组两两$p\le.001$。{\color{ared}亲强基尼0.239（5.6x中立）}，亲弱0.158（3.7x中立），中立0.043。任何方向偏见均致公平性显著下降——代价是偏见本身的函数。\par}
+
+\vspace{4mm}
+
+\noindent\colorbox{fblue!12}{\begin{minipage}{259mm}\vspace{2mm}\hspace{3mm}{\fontsize{30}{38}\selectfont\bfseries\sffamily\color{fblue}五、综合对比}\vspace{2mm}\end{minipage}}\\[1mm]
+\textcolor{gold}{\rule{259mm}{1.5pt}}\\[2mm]
+
+{\centering\includegraphics[width=235mm]{figures/fig9_mediator_comparison.png}\par}
+\vspace{0.5mm}{\centering\fontsize{15}{20}\selectfont\sffamily 图5：四面板对比（协议率/基尼/领土/PA差值）\par}
+
+\vspace{1mm}
+{\fontsize{24}{34}\selectfont\raggedright 四面板勾勒偏见效应完整轮廓：中立协议率略高，亲强基尼5.6x中立，偏见方向精确映射分配方向，PA差值符号完全相反。四维度系统性差异表明偏见在提案/质量/政治后果三层面均具深层影响力。\par}
+
+\end{minipage}%
+\hspace{16mm}%
+\begin{minipage}[t]{259mm}
+
+% COL 3
+\noindent\colorbox{fblue!12}{\begin{minipage}{259mm}\vspace{2mm}\hspace{3mm}{\fontsize{30}{38}\selectfont\bfseries\sffamily\color{fblue}六、H3：附带支付催化效应}\vspace{2mm}\end{minipage}}\\[1mm]
+\textcolor{gold}{\rule{259mm}{1.5pt}}\\[2mm]
+
+{\centering\includegraphics[width=235mm]{figures/fig6_payment_on_off.png}\par}
+\vspace{0.5mm}{\centering\fontsize{15}{20}\selectfont\sffamily 图6：支付启用/禁用协议率对比\par}
+
+\vspace{1mm}
+{\fontsize{24}{34}\selectfont\raggedright \textbf{H3成立。L-PS：}{\color{ared}60\%$\to$10\%，降幅83.3\%（$p{=}.018$）}。禁用后CD 46\%$\to$27\%，与Quandt（1986）反事实一致。\par}
+
+\vspace{1mm}
+{\centering\renewcommand{\arraystretch}{1.5}\fontsize{21}{28}\selectfont%
+\begin{tabular}{lcccc}
+\toprule
+\textbf{条件} & \textbf{启用} & \textbf{禁用} & \textbf{降幅} & \textbf{\textit{p}} \\
+\midrule
+L-PS & 60\% & 10\% & {\color{ared}\textbf{83\%}} & {\color{ared}\textbf{.018}} \\
+CD   & 46\% & 27\% & 40\% & .40 \\
+H-PS & 46\% & 50\% & — & .85 \\
+\bottomrule
+\end{tabular}\par}
+
+\vspace{1mm}
+{\centering\includegraphics[width=235mm]{figures/fig5_side_payment_pattern.png}\par}
+\vspace{0.5mm}{\centering\fontsize{15}{20}\selectfont\sffamily 图7：三阶段递增（R1--4$\le$8\%/R5--6$\le$12\%/R7--8无上限）\par}
+
+\vspace{1mm}
+{\fontsize{24}{34}\selectfont\raggedright H-PS不敏感：AR=3.0时结构优势主导，支付边际贡献被稀释。催化效应在实力更对称时最强，有效性受不对称度结构约束。\par}
+
+\vspace{4mm}
+
+\noindent\colorbox{fblue!12}{\begin{minipage}{259mm}\vspace{2mm}\hspace{3mm}{\fontsize{30}{38}\selectfont\bfseries\sffamily\color{fblue}七、H4：国内评价完全反向}\vspace{2mm}\end{minipage}}\\[1mm]
+\textcolor{gold}{\rule{259mm}{1.5pt}}\\[2mm]
+
+{\centering\includegraphics[width=235mm]{figures/fig4_da_scores.png}\par}
+\vspace{0.5mm}{\centering\fontsize{15}{20}\selectfont\sffamily 图8：PA与国内压力双面板\par}
+
+\vspace{1mm}
+{\centering\renewcommand{\arraystretch}{1.5}\fontsize{21}{28}\selectfont%
+\begin{tabular}{lccc}
+\toprule
+\textbf{类型} & \textbf{强方PA} & \textbf{弱方PA} & \textbf{$\Delta$} \\
+\midrule
+亲强 & 0.458 & 0.295 & +0.163 \\
+亲弱 & 0.122 & 0.669 & {\color{ared}\textbf{--0.547}} \\
+中立 & 0.232 & 0.328 & --0.096 \\
+\bottomrule
+\end{tabular}\par}
+
+\vspace{1mm}
+{\fontsize{24}{34}\selectfont\raggedright \textbf{H4成立。}强--弱PA差值跨越0.807单位（全距1.0）。压力同步反转（亲弱强方0.886，亲强弱方0.710）。中立下双方PA$<$0.35——\textit{公平但无人满意}。萨达特1981年遭刺杀（Stein, 1999）即历史印证。\par}
+
+\vspace{4mm}
+
+\noindent\colorbox{fblue!12}{\begin{minipage}{259mm}\vspace{2mm}\hspace{3mm}{\fontsize{30}{38}\selectfont\bfseries\sffamily\color{fblue}八、方法论贡献与核心结论}\vspace{2mm}\end{minipage}}\\[1mm]
+\textcolor{gold}{\rule{259mm}{1.5pt}}\\[2mm]
+
+{\fontsize{24}{34}\selectfont\raggedright%
+\textbf{方法论：}“案例校准$\to$提示工程$\to$评估迭代$\to$统计检验”的计算社会科学范式。独立评估6维质控，9轮迭代收敛。全部代码与提示词公开。
+
+四大结论：\textbf{①}偏见$\to$提案，$d=4$--$7$，$p<.001$；\textbf{②}偏见$\to$公平性$\downarrow$，$\eta^2=0.601$；\textbf{③}支付催化效应受不对称度约束（低不对称降幅83\%）；\textbf{④}偏见$\to$国内评价完全反向（$\Delta$跨越0.8单位）。
+\par}
+
+\vspace{4mm}
+
+\noindent\colorbox{fblue!12}{\begin{minipage}{259mm}\vspace{2mm}\hspace{3mm}{\fontsize{30}{38}\selectfont\bfseries\sffamily\color{fblue}主要参考文献}\vspace{2mm}\end{minipage}}\\[1mm]
+\textcolor{gold}{\rule{259mm}{1.5pt}}\\[2mm]
+
+{\fontsize{18}{26}\selectfont\raggedright%
+Kim, J. Y. (2025). Biased mediation. \textit{J. Econ. Theory}, 229, 105960.
+\;|\; Kydd, A. H. (2003). Which side are you on? \textit{AJPS}, 47(4), 597--611.
+\;|\; Quandt, W. B. (1986). \textit{Camp David}. Brookings.
+\;|\; Savun, B. (2008). Information, bias, and mediation success. \textit{ISQ}, 52(1), 25--47.
+\;|\; Park, J. S. et al. (2023). Generative agents. \textit{UIST '23}.
+\;|\; Chawla, K. et al. (2025). Explicit cooperation... \textit{ICWSM 2025}.
+\;|\; Preacher, K. J. \& Hayes, A. F. (2008). Asymptotic and resampling... \textit{BRM}, 40(3), 879--891.
+\;|\; Stein, K. W. (1999). \textit{Heroic Diplomacy}. Routledge.
+\par}
+
+\end{minipage}
+\end{minipage}
+
+\vspace*{\fill}
+\colorbox{gold}{\begin{minipage}{841mm}\vspace{1.2mm}\end{minipage}}
+\colorbox{fblue}{\begin{minipage}{841mm}
+\vspace{6mm}\centering
+{\fontsize{18}{24}\selectfont\sffamily\color{white}
+ \href{mailto:yangyh@fudan.edu.cn}{yangyh@fudan.edu.cn}
+ \hspace{3cm} 代码即将公开：GitHub (available upon request)
+ \hspace{3cm} 复旦大学 · 国际关系与公共事务学院 · 2026}
+\vspace{6mm}
+\end{minipage}}
+\end{document}

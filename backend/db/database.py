@@ -79,6 +79,24 @@ CREATE INDEX IF NOT EXISTS idx_runs_condition ON runs(experiment_id, condition_c
 CREATE INDEX IF NOT EXISTS idx_rounds_run ON rounds(run_id);
 CREATE INDEX IF NOT EXISTS idx_evaluations_experiment ON evaluations(experiment_id);
 CREATE INDEX IF NOT EXISTS idx_analysis_experiment ON analysis_results(experiment_id);
+
+CREATE TABLE IF NOT EXISTS persistence_results (
+    id                  TEXT PRIMARY KEY,
+    experiment_id       TEXT NOT NULL,
+    run_id              TEXT NOT NULL,
+    condition_code      TEXT NOT NULL,
+    mediator_type       TEXT NOT NULL,
+    asymmetry_level     TEXT NOT NULL,
+    negotiation_rounds  INTEGER NOT NULL DEFAULT 0,
+    agreement_gini      REAL DEFAULT 0.0,
+    survival_rounds     INTEGER NOT NULL DEFAULT 0,
+    event               INTEGER NOT NULL DEFAULT 0,
+    side_payment_total  REAL DEFAULT 0.0,
+    duration_seconds    REAL DEFAULT 0.0,
+    FOREIGN KEY (experiment_id) REFERENCES experiments(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_persistence_experiment ON persistence_results(experiment_id);
 """
 
 

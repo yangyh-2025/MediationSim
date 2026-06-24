@@ -31,3 +31,20 @@ frontend/dist/
 # Runtime data (experiment outputs, logs)
 data/logs/
 data/mediation_sim.db
+
+# Built outputs (PDF/DOCX)
+docs/*.pdf
+docs/*.docx
+
+# Copyrighted third-party template
+docs/poster/
+
+# Poster build work directory
+docs/poster_my/poster.pdf
+docs/poster_my/STKaitiSC-Regular.ttf
+docs/poster_my/beamerthemegemini.sty
+docs/poster_my/figures/
+
+# OS files
+.DS_Store
+*/.DS_Store
